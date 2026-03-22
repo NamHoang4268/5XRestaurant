@@ -36,9 +36,7 @@ import TablePaymentSuccessPage from '../pages/TablePaymentSuccessPage';
 import SupportChatAdmin from '@/pages/SupportChatAdmin';
 
 import CustomerCheckinPage from '../pages/CustomerCheckinPage';
-import KitchenDisplayPage from '../pages/KitchenDisplayPage';
 import WaiterBoardPage from '../pages/WaiterBoardPage';
-import FoodDashboard from '../pages/FoodDashboard';
 import DashboardRouter from '../pages/DashboardRouter';
 
 const router = createBrowserRouter([
@@ -88,7 +86,6 @@ const router = createBrowserRouter([
             },
 
             // === KITCHEN & WAITER ===
-            { path: 'kitchen', element: <KitchenDisplayPage /> },
             { path: 'waiter-board', element: <WaiterBoardPage /> },
 
             // === AUTH ===
