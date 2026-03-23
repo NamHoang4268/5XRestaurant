@@ -20,10 +20,22 @@ const SOCKET_URL = import.meta.env.VITE_SERVER_URL || 'http://localhost:8080';
 
 // Kitchen status badge config
 const KITCHEN_STATUS = {
-    pending:  { label: 'Chờ bếp',    color: 'bg-yellow-100 text-yellow-700 border border-yellow-300' },
-    cooking:  { label: 'Đang nấu',   color: 'bg-blue-100 text-blue-700 border border-blue-300' },
-    ready:    { label: 'Sẵn sàng',   color: 'bg-green-100 text-green-700 border border-green-300' },
-    served:   { label: 'Đã phục vụ', color: 'bg-gray-100 text-gray-500 border border-gray-300' },
+    pending: {
+        label: 'Chờ bếp',
+        color: 'bg-yellow-100 text-yellow-700 border border-yellow-300',
+    },
+    cooking: {
+        label: 'Đang nấu',
+        color: 'bg-blue-100 text-blue-700 border border-blue-300',
+    },
+    ready: {
+        label: 'Sẵn sàng',
+        color: 'bg-green-100 text-green-700 border border-green-300',
+    },
+    served: {
+        label: 'Đã phục vụ',
+        color: 'bg-gray-100 text-gray-500 border border-gray-300',
+    },
 };
 
 const TableMenuPage = () => {
@@ -44,6 +56,19 @@ const TableMenuPage = () => {
     const [currentOrder, setCurrentOrder] = useState(null);
     const [isCheckingAuth, setIsCheckingAuth] = useState(true);
     const [isSubmitting, setIsSubmitting] = useState(false);
+    // Display values for qty inputs (can be empty string while typing)
+    const [inputValues, setInputValues] = useState({});
+
+    const fetchCurrentOrder = useCallback(async () => {
+        try {
+            const response = await Axios({
+                ...SummaryApi.get_current_table_order,
+            });
+            if (response.data.success) setCurrentOrder(response.data.data);
+        } catch (error) {
+            console.error('Error fetching current order:', error);
+        }
+    }, []);
 
     // -- Socket setup (US20, US23, US24) --
     useEffect(() => {
@@ -52,10 +77,13 @@ const TableMenuPage = () => {
 
         // Khi món ready – chef đã nấu xong (US23)
         s.on('dish:ready', (data) => {
-            toast(`🍽️ "${data.productName}" tại ${data.tableName} đã sẵn sàng!`, {
-                icon: '🔔',
-                duration: 6000,
-            });
+            toast(
+                `🍽️ "${data.productName}" tại ${data.tableName} đã sẵn sàng!`,
+                {
+                    icon: '🔔',
+                    duration: 6000,
+                }
+            );
             fetchCurrentOrder();
         });
 
@@ -65,7 +93,7 @@ const TableMenuPage = () => {
         });
 
         return () => s.disconnect();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
     // Check if user is a table account
@@ -85,7 +113,7 @@ const TableMenuPage = () => {
         }
         fetchTableSession();
         fetchCurrentOrder();
-    }, [user, navigate, isCheckingAuth]);
+    }, [user, navigate, isCheckingAuth, fetchCurrentOrder]);
 
     const fetchTableSession = async () => {
         try {
@@ -95,15 +123,6 @@ const TableMenuPage = () => {
             console.error('Error fetching table session:', error);
         }
     };
-
-    const fetchCurrentOrder = useCallback(async () => {
-        try {
-            const response = await Axios({ ...SummaryApi.get_current_table_order });
-            if (response.data.success) setCurrentOrder(response.data.data);
-        } catch (error) {
-            console.error('Error fetching current order:', error);
-        }
-    }, []);
 
     // Fetch categories
     useEffect(() => {
@@ -146,9 +165,22 @@ const TableMenuPage = () => {
 
     // -- Local order actions --
     const handleAddToLocalOrder = (product) => {
+        // AC 7.2 – client-side guard (mirrors isAvailable)
+        const available = product.status === 'available' && product.stock !== 0;
+        if (!available) {
+            toast.error(`"${product.name}" hiện không khả dụng.`);
+            return;
+        }
         setLocalOrder((prev) => {
-            const existing = prev.find((item) => item.productId === product._id);
+            const existing = prev.find(
+                (item) => item.productId === product._id
+            );
             if (existing) {
+                // AC 7.3 – also check when "+" card button is clicked
+                if (product.stock > 0 && existing.quantity + 1 > product.stock) {
+                    toast.error(`Chỉ còn ${product.stock} suất "${product.name}".`);
+                    return prev;
+                }
                 return prev.map((item) =>
                     item.productId === product._id
                         ? { ...item, quantity: item.quantity + 1 }
@@ -163,25 +195,74 @@ const TableMenuPage = () => {
                     price: product.price,
                     image: product.image?.[0] || '',
                     quantity: 1,
+                    stock: product.stock, // lưu lại để validate client-side
                     note: '',
                 },
             ];
         });
-        toast.success(`Đã thêm ${product.name}`);
+        // AC 10 – standardised toast message
+        toast.success(`Đã thêm ${product.name} vào giỏ hàng.`);
+    };
+
+    // AC 5 – direct quantity input: allow empty while typing
+    const handleLocalQtyInputChange = (productId, value) => {
+        setInputValues((prev) => ({ ...prev, [productId]: value }));
+        const qty = parseInt(value);
+        if (!isNaN(qty) && qty >= 1) {
+            // AC 7.3 – client-side stock check
+            const item = localOrder.find((i) => i.productId === productId);
+            if (item && item.stock > 0 && qty > item.stock) {
+                toast.error(`Chỉ còn ${item.stock} suất "${item.name}".`);
+                return;
+            }
+            setLocalOrder((prev) =>
+                prev.map((i) =>
+                    i.productId === productId ? { ...i, quantity: qty } : i
+                )
+            );
+        }
+    };
+
+    // On blur: revert display if empty, invalid, OR exceeds stock
+    const handleLocalQtyInputBlur = (productId) => {
+        setInputValues((prev) => {
+            const val = parseInt(prev[productId]);
+            // Invalid or empty → revert
+            if (isNaN(val) || val < 1) {
+                const { [productId]: _, ...rest } = prev;
+                return rest;
+            }
+            // Exceeds stock → revert (stock is stored on the localOrder item)
+            const item = localOrder.find((i) => i.productId === productId);
+            if (item && item.stock > 0 && val > item.stock) {
+                const { [productId]: _, ...rest } = prev;
+                return rest;
+            }
+            return prev; // valid – keep
+        });
     };
 
     const handleLocalQtyChange = (productId, delta) => {
         setLocalOrder((prev) =>
-            prev.map((item) =>
-                item.productId === productId
-                    ? { ...item, quantity: Math.max(1, item.quantity + delta) }
-                    : item
-            )
+            prev.map((item) => {
+                if (item.productId !== productId) return item;
+                const newQty = Math.max(1, item.quantity + delta);
+                // AC 7.3 – client-side stock check on "+"
+                if (delta > 0 && item.stock > 0 && newQty > item.stock) {
+                    toast.error(`Chỉ còn ${item.stock} suất "${item.name}".`);
+                    return item; // giự nguyên
+                }
+                return { ...item, quantity: newQty };
+            })
         );
+        // Sync display value
+        setInputValues((prev) => { const { [productId]: _, ...rest } = prev; return rest; });
     };
 
     const handleRemoveLocalItem = (productId) => {
-        setLocalOrder((prev) => prev.filter((item) => item.productId !== productId));
+        setLocalOrder((prev) =>
+            prev.filter((item) => item.productId !== productId)
+        );
     };
 
     // Gửi đơn lên server (US17) + emit socket to kitchen (US20)
@@ -214,7 +295,10 @@ const TableMenuPage = () => {
                         orderId: response.data.data?.tableOrder?._id,
                         tableId: tableInfo?.tableId,
                         tableName: tableInfo?.tableNumber || 'Bàn',
-                        items: localOrder.map((i) => ({ name: i.name, quantity: i.quantity })),
+                        items: localOrder.map((i) => ({
+                            name: i.name,
+                            quantity: i.quantity,
+                        })),
                     });
                 }
             }
@@ -236,12 +320,15 @@ const TableMenuPage = () => {
         }
     };
 
-    const totalAmount = localOrder.reduce((sum, item) => sum + item.price * item.quantity, 0);
+    const totalAmount = localOrder.reduce(
+        (sum, item) => sum + item.price * item.quantity,
+        0
+    );
 
     // Count items not yet served in currentOrder (US18)
-    const activeItemsCount = currentOrder?.items?.filter(
-        (i) => i.kitchenStatus !== 'served'
-    ).length || 0;
+    const activeItemsCount =
+        currentOrder?.items?.filter((i) => i.kitchenStatus !== 'served')
+            .length || 0;
 
     if (loading) {
         return (
@@ -267,7 +354,10 @@ const TableMenuPage = () => {
                     <div className="flex items-center gap-3">
                         {/* Current Order button (US18) */}
                         <button
-                            onClick={() => { fetchCurrentOrder(); setShowCurrentOrder(true); }}
+                            onClick={() => {
+                                fetchCurrentOrder();
+                                setShowCurrentOrder(true);
+                            }}
                             className="relative bg-white text-blue-500 p-3 rounded-full hover:bg-blue-50 transition-colors"
                             title="Xem đơn gọi món"
                         >
@@ -309,7 +399,9 @@ const TableMenuPage = () => {
                         {categories.map((category) => (
                             <button
                                 key={category._id}
-                                onClick={() => setSelectedCategory(category._id)}
+                                onClick={() =>
+                                    setSelectedCategory(category._id)
+                                }
                                 className={`px-6 py-2 rounded-full font-semibold whitespace-nowrap transition-all ${
                                     selectedCategory === category._id
                                         ? 'bg-orange-500 text-white shadow-md'
@@ -326,36 +418,60 @@ const TableMenuPage = () => {
             {/* Products Grid */}
             <div className="max-w-7xl mx-auto p-4">
                 <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                    {products.map((product) => (
-                        <div
-                            key={product._id}
-                            className="bg-white rounded-xl shadow-sm overflow-hidden hover:shadow-md transition-shadow"
-                        >
-                            <div className="aspect-square bg-gray-100">
-                                {product.image?.[0] && (
-                                    <img
-                                        src={product.image[0]}
-                                        alt={product.name}
-                                        className="w-full h-full object-cover"
-                                    />
-                                )}
+                    {products.map((product) => {
+                        // Product is unavailable if status says so OR stock is exactly 0
+                        const isAvailable = product.status === 'available' && product.stock !== 0;
+                        return (
+                            <div
+                                key={product._id}
+                                className={`bg-white rounded-xl shadow-sm overflow-hidden transition-shadow ${
+                                    isAvailable
+                                        ? 'hover:shadow-md'
+                                        : 'opacity-70'
+                                }`}
+                            >
+                                {/* AC 7.2 – unavailable overlay */}
+                                <div className="relative aspect-square bg-gray-100">
+                                    {product.image?.[0] && (
+                                        <img
+                                            src={product.image[0]}
+                                            alt={product.name}
+                                            className="w-full h-full object-cover"
+                                        />
+                                    )}
+                                    {!isAvailable && (
+                                        <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
+                                            <span className="bg-red-500 text-white text-xs font-bold px-3 py-1 rounded-full">
+                                                Hết hàng
+                                            </span>
+                                        </div>
+                                    )}
+                                </div>
+                                <div className="p-3">
+                                    <h3 className="font-semibold text-gray-800 mb-1 line-clamp-2">
+                                        {product.name}
+                                    </h3>
+                                    <p className="text-orange-500 font-bold text-lg mb-2">
+                                        {product.price?.toLocaleString('vi-VN')}
+                                        đ
+                                    </p>
+                                    <button
+                                        onClick={() =>
+                                            handleAddToLocalOrder(product)
+                                        }
+                                        disabled={!isAvailable}
+                                        className={`w-full font-semibold py-2 rounded-lg transition-colors text-white ${
+                                            isAvailable
+                                                ? 'bg-orange-500 hover:bg-orange-600'
+                                                : 'bg-gray-300 cursor-not-allowed'
+                                        }`}
+                                    >
+                                        {isAvailable ? '+ Thêm' : 'Hết hàng'}
+                                    </button>
+                                </div>
                             </div>
-                            <div className="p-3">
-                                <h3 className="font-semibold text-gray-800 mb-1 line-clamp-2">
-                                    {product.name}
-                                </h3>
-                                <p className="text-orange-500 font-bold text-lg mb-2">
-                                    {product.price?.toLocaleString('vi-VN')}đ
-                                </p>
-                                <button
-                                    onClick={() => handleAddToLocalOrder(product)}
-                                    className="w-full bg-orange-500 hover:bg-orange-600 text-white font-semibold py-2 rounded-lg transition-colors"
-                                >
-                                    + Thêm
-                                </button>
-                            </div>
-                        </div>
-                    ))}
+                        );
+                    })}
                 </div>
             </div>
 
@@ -373,29 +489,100 @@ const TableMenuPage = () => {
                     >
                         {/* Header */}
                         <div className="bg-orange-500 text-white p-4 flex justify-between items-center">
-                            <h2 className="text-xl font-bold">Món đã chọn ({localOrder.length})</h2>
-                            <button onClick={() => setShowCart(false)} className="text-2xl leading-none">&times;</button>
+                            <h2 className="text-xl font-bold">
+                                Món đã chọn ({localOrder.length})
+                            </h2>
+                            <button
+                                onClick={() => setShowCart(false)}
+                                className="text-2xl leading-none"
+                            >
+                                &times;
+                            </button>
                         </div>
 
                         {/* Items */}
                         <div className="flex-1 overflow-y-auto p-4">
                             {localOrder.length === 0 ? (
-                                <p className="text-center text-gray-500 mt-8">Chưa chọn món nào</p>
+                                <p className="text-center text-gray-500 mt-8">
+                                    Chưa chọn món nào
+                                </p>
                             ) : (
                                 <div className="space-y-4">
                                     {localOrder.map((item) => (
-                                        <div key={item.productId} className="flex gap-3 bg-gray-50 p-3 rounded-lg">
+                                        <div
+                                            key={item.productId}
+                                            className="flex gap-3 bg-gray-50 p-3 rounded-lg"
+                                        >
                                             {item.image && (
-                                                <img src={item.image} alt={item.name} className="w-16 h-16 object-cover rounded-lg flex-shrink-0" />
+                                                <img
+                                                    src={item.image}
+                                                    alt={item.name}
+                                                    className="w-16 h-16 object-cover rounded-lg flex-shrink-0"
+                                                />
                                             )}
                                             <div className="flex-1">
-                                                <h3 className="font-semibold text-gray-800">{item.name}</h3>
-                                                <p className="text-orange-500 font-bold">{item.price?.toLocaleString('vi-VN')}đ</p>
-                                                <div className="flex items-center gap-3 mt-2">
-                                                    <button onClick={() => handleLocalQtyChange(item.productId, -1)} className="bg-gray-200 text-gray-700 p-1 rounded"><FiMinus /></button>
-                                                    <span className="font-semibold text-orange-500 w-6 text-center">{item.quantity}</span>
-                                                    <button onClick={() => handleLocalQtyChange(item.productId, 1)} className="bg-gray-200 text-gray-700 p-1 rounded"><FiPlus /></button>
-                                                    <button onClick={() => handleRemoveLocalItem(item.productId)} className="ml-auto text-red-500"><FiTrash2 /></button>
+                                                <h3 className="font-semibold text-gray-800">
+                                                    {item.name}
+                                                </h3>
+                                                <p className="text-orange-500 font-bold">
+                                                    {item.price?.toLocaleString(
+                                                        'vi-VN'
+                                                    )}
+                                                    đ
+                                                </p>
+                                                {/* AC 5 – quantity controls with direct input */}
+                                                <div className="flex items-center gap-2 mt-2">
+                                                    <button
+                                                        onClick={() =>
+                                                            handleLocalQtyChange(
+                                                                item.productId,
+                                                                -1
+                                                            )
+                                                        }
+                                                        className="bg-gray-200 text-gray-700 p-1 rounded"
+                                                    >
+                                                        <FiMinus />
+                                                    </button>
+                                                    <input
+                                                        type="number"
+                                                        min="1"
+                                                        value={
+                                                            inputValues[item.productId] !== undefined
+                                                                ? inputValues[item.productId]
+                                                                : item.quantity
+                                                        }
+                                                        onChange={(e) =>
+                                                            handleLocalQtyInputChange(
+                                                                item.productId,
+                                                                e.target.value
+                                                            )
+                                                        }
+                                                        onBlur={() =>
+                                                            handleLocalQtyInputBlur(item.productId)
+                                                        }
+                                                        className="w-12 text-center border border-gray-300 rounded text-sm font-semibold text-orange-500 focus:outline-none focus:ring-1 focus:ring-orange-400 py-0.5"
+                                                    />
+                                                    <button
+                                                        onClick={() =>
+                                                            handleLocalQtyChange(
+                                                                item.productId,
+                                                                1
+                                                            )
+                                                        }
+                                                        className="bg-gray-200 text-gray-700 p-1 rounded"
+                                                    >
+                                                        <FiPlus />
+                                                    </button>
+                                                    <button
+                                                        onClick={() =>
+                                                            handleRemoveLocalItem(
+                                                                item.productId
+                                                            )
+                                                        }
+                                                        className="ml-auto text-red-500"
+                                                    >
+                                                        <FiTrash2 />
+                                                    </button>
                                                 </div>
                                             </div>
                                         </div>
@@ -409,7 +596,9 @@ const TableMenuPage = () => {
                             <div className="border-t p-4 space-y-3">
                                 <div className="flex justify-between items-center text-lg font-bold">
                                     <span className="text-gray-700">Tổng:</span>
-                                    <span className="text-orange-500">{totalAmount.toLocaleString('vi-VN')}đ</span>
+                                    <span className="text-orange-500">
+                                        {totalAmount.toLocaleString('vi-VN')}đ
+                                    </span>
                                 </div>
                                 <button
                                     onClick={handlePlaceOrder}
@@ -417,7 +606,9 @@ const TableMenuPage = () => {
                                     className="w-full flex items-center justify-center gap-2 bg-orange-500 hover:bg-orange-600 disabled:opacity-60 text-white font-bold py-3 rounded-lg transition-colors"
                                 >
                                     <FiSend />
-                                    {isSubmitting ? 'Đang gửi...' : 'Gọi món ngay 🍽️'}
+                                    {isSubmitting
+                                        ? 'Đang gửi...'
+                                        : 'Gọi món ngay 🍽️'}
                                 </button>
                             </div>
                         )}
@@ -442,13 +633,21 @@ const TableMenuPage = () => {
                             <div className="flex justify-between items-center">
                                 <div className="flex items-center gap-2">
                                     <MdOutlineKitchen size={22} />
-                                    <h2 className="text-xl font-bold">Đơn gọi món</h2>
+                                    <h2 className="text-xl font-bold">
+                                        Đơn gọi món
+                                    </h2>
                                 </div>
-                                <button onClick={() => setShowCurrentOrder(false)} className="text-2xl leading-none">&times;</button>
+                                <button
+                                    onClick={() => setShowCurrentOrder(false)}
+                                    className="text-2xl leading-none"
+                                >
+                                    &times;
+                                </button>
                             </div>
                             {currentOrder && (
                                 <p className="text-sm opacity-80 mt-1">
-                                    Bàn: {currentOrder.tableNumber} &bull; {currentOrder.items?.length || 0} món
+                                    Bàn: {currentOrder.tableNumber} &bull;{' '}
+                                    {currentOrder.items?.length || 0} món
                                 </p>
                             )}
                         </div>
@@ -457,22 +656,40 @@ const TableMenuPage = () => {
                         <div className="flex-1 overflow-y-auto p-4">
                             {!currentOrder?.items?.length ? (
                                 <div className="text-center text-gray-500 mt-12">
-                                    <FiList size={48} className="mx-auto mb-4 opacity-30" />
+                                    <FiList
+                                        size={48}
+                                        className="mx-auto mb-4 opacity-30"
+                                    />
                                     <p>Chưa có món nào trong đơn</p>
-                                    <p className="text-sm mt-2">Hãy thêm món từ menu và nhấn "Gọi món"!</p>
+                                    <p className="text-sm mt-2">
+                                        Hãy thêm món từ menu và nhấn "Gọi món"!
+                                    </p>
                                 </div>
                             ) : (
                                 <div className="space-y-3">
                                     {currentOrder.items.map((item, index) => {
-                                        const statusCfg = KITCHEN_STATUS[item.kitchenStatus] || KITCHEN_STATUS.pending;
+                                        const statusCfg =
+                                            KITCHEN_STATUS[
+                                                item.kitchenStatus
+                                            ] || KITCHEN_STATUS.pending;
                                         return (
-                                            <div key={index} className="bg-gray-50 rounded-xl p-3 flex items-center gap-3">
+                                            <div
+                                                key={index}
+                                                className="bg-gray-50 rounded-xl p-3 flex items-center gap-3"
+                                            >
                                                 {/* Image */}
                                                 <div className="w-14 h-14 bg-gray-200 rounded-lg overflow-hidden flex-shrink-0">
-                                                    {item.productId?.image?.[0] && (
+                                                    {item.productId
+                                                        ?.image?.[0] && (
                                                         <img
-                                                            src={item.productId.image[0]}
-                                                            alt={item.productId.name}
+                                                            src={
+                                                                item.productId
+                                                                    .image[0]
+                                                            }
+                                                            alt={
+                                                                item.productId
+                                                                    .name
+                                                            }
                                                             className="w-full h-full object-cover"
                                                         />
                                                     )}
@@ -480,17 +697,30 @@ const TableMenuPage = () => {
                                                 {/* Info */}
                                                 <div className="flex-1 min-w-0">
                                                     <p className="font-semibold text-gray-800 truncate">
-                                                        {item.productId?.name || item.name || 'Món ăn'}
+                                                        {item.productId?.name ||
+                                                            item.name ||
+                                                            'Món ăn'}
                                                     </p>
                                                     <p className="text-sm text-gray-500">
-                                                        x{item.quantity} &bull; {((item.price || 0) * item.quantity).toLocaleString('vi-VN')}đ
+                                                        x{item.quantity} &bull;{' '}
+                                                        {(
+                                                            (item.price || 0) *
+                                                            item.quantity
+                                                        ).toLocaleString(
+                                                            'vi-VN'
+                                                        )}
+                                                        đ
                                                     </p>
                                                     {item.note && (
-                                                        <p className="text-xs text-yellow-600 mt-0.5">📝 {item.note}</p>
+                                                        <p className="text-xs text-yellow-600 mt-0.5">
+                                                            📝 {item.note}
+                                                        </p>
                                                     )}
                                                 </div>
                                                 {/* Kitchen status badge */}
-                                                <span className={`text-xs px-2 py-1 rounded-full font-medium whitespace-nowrap ${statusCfg.color}`}>
+                                                <span
+                                                    className={`text-xs px-2 py-1 rounded-full font-medium whitespace-nowrap ${statusCfg.color}`}
+                                                >
                                                     {statusCfg.label}
                                                 </span>
                                             </div>
@@ -506,13 +736,21 @@ const TableMenuPage = () => {
                                 <div className="flex justify-between text-sm text-gray-600">
                                     <span>Tổng số lượng:</span>
                                     <span className="font-semibold">
-                                        {currentOrder.items.reduce((s, i) => s + i.quantity, 0)}
+                                        {currentOrder.items.reduce(
+                                            (s, i) => s + i.quantity,
+                                            0
+                                        )}
                                     </span>
                                 </div>
                                 <div className="flex justify-between text-lg font-bold">
-                                    <span className="text-blue-800">Tổng cộng:</span>
+                                    <span className="text-blue-800">
+                                        Tổng cộng:
+                                    </span>
                                     <span className="text-blue-600">
-                                        {currentOrder.total?.toLocaleString('vi-VN')}đ
+                                        {currentOrder.total?.toLocaleString(
+                                            'vi-VN'
+                                        )}
+                                        đ
                                     </span>
                                 </div>
                                 <button
@@ -526,7 +764,10 @@ const TableMenuPage = () => {
                                 </button>
                                 <div className="flex items-center gap-2 text-xs text-blue-700 bg-blue-50 border border-blue-200 rounded-lg p-2">
                                     <span>ℹ️</span>
-                                    <span>Bạn có thể tiếp tục gọi thêm món. Thanh toán khi dùng xong.</span>
+                                    <span>
+                                        Bạn có thể tiếp tục gọi thêm món. Thanh
+                                        toán khi dùng xong.
+                                    </span>
                                 </div>
                             </div>
                         )}
