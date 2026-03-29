@@ -1,6 +1,18 @@
 import React from 'react';
+import { useSelector } from 'react-redux';
+import { useNavigate } from 'react-router-dom';
+import { valideURLConvert } from '@/utils/valideURLConvert';
+import AnimatedList from '../animations/AnimatedList';
 
 export const BentoGrid = () => {
+    const categoryData = useSelector((state) => state.product.allCategory);
+    const navigate = useNavigate();
+
+    const handleRedirectProductListPage = (id, cat) => {
+        const url = `/${valideURLConvert(cat)}-${id}`;
+        navigate(url);
+    };
+
     return (
         <div className="grid grid-cols-1 md:grid-cols-4 lg:grid-cols-6 gap-6 lg:gap-8">
             {/* Large Hero Tile */}
@@ -38,79 +50,20 @@ export const BentoGrid = () => {
             </div>
 
             {/* Cuisine Categories */}
-            <div className="md:col-span-2 lg:col-span-2 flex flex-col gap-6">
-                <h3 className="text-sm font-['Inter'] font-bold uppercase tracking-[0.2em] text-[#C05E42] px-2">
-                    Cuisine Chapters
+            <div className="md:col-span-4 lg:col-span-2 w-full gap-2">
+                <h3 className="text-xl font-bold uppercase tracking-[0.2em] text-[#C05E42] px-2">
+                    Danh mục món ăn
                 </h3>
-                <div className="grid grid-cols-2 gap-4 flex-grow">
-                    {/* Starters */}
-                    <a
-                        className="relative group overflow-hidden rounded-xl aspect-square bg-[#f7f3ee] border border-[#C05E42]/5"
-                        href="#"
-                    >
-                        <img
-                            alt="Starters"
-                            className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500 opacity-80"
-                            src="https://lh3.googleusercontent.com/aida-public/AB6AXuBo_ZMDg1czZumEx-AS4Dg1BBk-UocfWpAaycYxCkEptlkY_Lve-w0Rq94rtNX2o9es1U9GCYr0uOwqOQWBA5cpMlSjzzLuC0dNN_GsVeb3jLZrNieXQJcxsq_5p4B2BZdzaYqkGTtne_5YdOs9GydaSziu5HluTGzn-WynJdRQTVi4sgqxqUBRKKczP3K3eMjUcOwsm6KRH7zUU7aKjn6b5ZQST1g2KrOLAI6Iv3-LMxNsXd19oH9f6dAVT_uIIlkFX631DxV6-xbQ"
-                        />
-                        <div className="absolute inset-0 bg-[#1c1c19]/30 flex items-center justify-center">
-                            <span className="text-white font-['Noto_Serif'] text-lg md:text-xl font-bold">
-                                Starters
-                            </span>
-                        </div>
-                    </a>
 
-                    {/* Mains */}
-                    <a
-                        className="relative group overflow-hidden rounded-xl aspect-square bg-[#f7f3ee] border border-[#C05E42]/5"
-                        href="#"
-                    >
-                        <img
-                            alt="Mains"
-                            className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500 opacity-80"
-                            src="https://lh3.googleusercontent.com/aida-public/AB6AXuD9JNqVau8WckNat2Z6yTpC-jkubSSFzBzg_4PJG20oRKdVxRzBK8tKcbARbnpoBSM24BUnHVn668wHPhgcwE3eZ4LDZ3_LizxB9CGZdPSkUF48_dTp7e39MQyeMw-V48tY1yayDaG9HnUszoaLlqGpbOQO88zrKvKkRVWvUFwR1E9v-TLWZbo7Ts3AE8ZpwzV2b4NXF9Q8IOyvicFpvaTaDjhFQxSyssIi9hW-jsAnsa_70OM_z-ag45wn4xUKXhQFvazm8ovUnJZl"
-                        />
-                        <div className="absolute inset-0 bg-[#1c1c19]/30 flex items-center justify-center">
-                            <span className="text-white font-['Noto_Serif'] text-lg md:text-xl font-bold">
-                                Mains
-                            </span>
-                        </div>
-                    </a>
-
-                    {/* Desserts */}
-                    <a
-                        className="relative group overflow-hidden rounded-xl aspect-square bg-[#f7f3ee] border border-[#C05E42]/5"
-                        href="#"
-                    >
-                        <img
-                            alt="Desserts"
-                            className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500 opacity-80"
-                            src="https://lh3.googleusercontent.com/aida-public/AB6AXuAs3yQbu_TG8vUWAipluUCZ8fBUhCCr57t2cFhmUycQ6nxmJHLxRIkSMC7QV5pBw52mL5RKRIFYwQmNwvANoVpayMAGfCcL-Ex-ySg0OjcVjs-lETO79mUZPiQ9Kt854whtntEuuvHEpwiiV0ULGPZPWqgYYOxuXJzkA7XXk6IGALXR79WSoiB06kfLsBldQfZqwoD0oFI546i0qi78LeAWVHZ1g6zkiQBZx4Ll8UZBkduNBYljVTQHUMe5MPq39OApCamkc7W_HeVc"
-                        />
-                        <div className="absolute inset-0 bg-[#1c1c19]/30 flex items-center justify-center">
-                            <span className="text-white font-['Noto_Serif'] text-lg md:text-xl font-bold">
-                                Desserts
-                            </span>
-                        </div>
-                    </a>
-
-                    {/* Cellar */}
-                    <a
-                        className="relative group overflow-hidden rounded-xl aspect-square bg-[#f7f3ee] border border-[#C05E42]/5"
-                        href="#"
-                    >
-                        <img
-                            alt="Wine"
-                            className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500 opacity-80"
-                            src="https://lh3.googleusercontent.com/aida-public/AB6AXuAD_Tk3JJbqV-TRCs3TXEJsicBd0bVDmgsCzachWusHadmSFe4x1hr1ghKRQDtUEhKh5cI3ue4OQkYWiz_cnr5Mlsqn9mVEBnUNNZ78nbMaulFsjaE9KNsxtTlbKH61GIt07wF0Y-xd0S0a4GGxTnjVW8WfLkXRCZcfwy4WMx7g5l-EBOLUaT3nerCf8Pu6vhvqfiMvQXqLBt5mKprxV7gXXkZOu3_2eYcMm9MpXBx4EuKll9w7PYQpe3Uae2woQbIbIE2Kj25UaA3G"
-                        />
-                        <div className="absolute inset-0 bg-[#1c1c19]/30 flex items-center justify-center">
-                            <span className="text-white font-['Noto_Serif'] text-lg md:text-xl font-bold">
-                                Cellar
-                            </span>
-                        </div>
-                    </a>
-                </div>
+                <AnimatedList
+                    items={categoryData}
+                    onItemSelect={(category) =>
+                        handleRedirectProductListPage(
+                            category._id,
+                            category.name
+                        )
+                    }
+                />
             </div>
         </div>
     );

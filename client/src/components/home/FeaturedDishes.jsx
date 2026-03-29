@@ -1,70 +1,221 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
+import Axios from '../../utils/Axios';
+import SummaryApi from '../../common/SummaryApi';
 
-const dishes = [
-    {
-        name: 'Hearth-Roasted Heritage Carrots',
-        description:
-            'Miso glaze, toasted pumpkin seeds, carrot-top chimichurri.',
-        image: 'https://lh3.googleusercontent.com/aida-public/AB6AXuAJP5OMhesP0Ibd9b5ngEEQO6-rxr8cWk0d8drprHVFtETf2xnsymIRAEfjsaFHaQp5CT0sx9NGb5pTKv4nCBcGaNE3Y2rFMuf5-qi5OYdqzxK6QyjVuLuUk8EFVsFmbzKvhbjC2pA-LGlYdwmNjyWvrQZoKePMyRZL9IUY5GdjUTCI9iRZsKSX6A58X3_66gp7FWst61OmmYd6h8if8JS4sR5higXGmmnboq7ExyhnXEJ0_omp70ejiKjB3ZSMnHADyJx_labzS6ng',
-        category: 'Starter',
-    },
-    {
-        name: 'Coastal Halibut & Saffron',
-        description:
-            'Leek fondue, crispy capers, saffron-infused beurre blanc.',
-        image: 'https://lh3.googleusercontent.com/aida-public/AB6AXuCH50FRuLxTtDnpVmRy5fOO90eW6TStIk_Q9C5itl2gIZF7oMEl2MJnHYhP5-ojmTkpbOGGIEWXbzQSZ_a5r5k2iHV5WEu6OebOW8PLzmh1YjIJnIMAN8eJCZyszSFSGalRNu_SP8HX3AJoUeANWs8BAdKktWfPLKCgGKKxVz84n3mId_D5EctfKiQWz5-MM2aI72wMh9XnrLimV5qerH3pINZMssGck_rwqzOIAvzQ9NezEYxtIS7ANo-xLr1MgfY7ylti8zVPmLeQ',
-        category: 'Main',
-    },
-    {
-        name: 'Summer Berry Soufflé',
-        description:
-            'Elderflower cream, wild strawberries, verbena shortbread.',
-        image: 'https://lh3.googleusercontent.com/aida-public/AB6AXuARHYZwc7rpo3N_qrlYZ9u6qkVNK6fyEJkmcYLbyeFDtsSspSx2WkQAbTnCJkv8JAXiLOU7X3nu1WKa30OTuECIUU9n7nYmyteauRJfvZSiWR4wP-Xj2jC4Vl_sJQnfS7zqkEs6o70QpxiXrXhRiakgbHL2Wg1xO7dues63iNSX9kH3jBg7Qk4HdwJV9LlAJFWMIZz3vYoM2rXufaY79AK2YRCTuqzeSOaCj_qGtN3e1K4sJhuJ5_Y_YLqTcAeGtGLdGq5wwPo0Xo-S',
-        category: 'Dessert',
-    },
-];
+// Tính số item hiển thị theo chiều rộng màn hình
+const useItemsPerPage = () => {
+    const getCount = () => {
+        if (typeof window === 'undefined') return 3;
+        if (window.innerWidth < 640) return 1; // mobile
+        if (window.innerWidth < 1024) return 2; // tablet
+        return 4; // desktop
+    };
+
+    const [count, setCount] = useState(getCount);
+
+    useEffect(() => {
+        const handleResize = () => setCount(getCount());
+        window.addEventListener('resize', handleResize);
+        return () => window.removeEventListener('resize', handleResize);
+    }, []);
+
+    return count;
+};
 
 export const FeaturedDishes = () => {
+    const [products, setProducts] = useState([]);
+    const [currentPage, setCurrentPage] = useState(0);
+    const [loading, setLoading] = useState(true);
+    const itemsPerPage = useItemsPerPage();
+
+    // Reset về trang đầu khi số item/trang thay đổi (resize)
+    useEffect(() => {
+        setCurrentPage(0);
+    }, [itemsPerPage]);
+
+    useEffect(() => {
+        fetchProducts();
+    }, []);
+
+    const fetchProducts = async () => {
+        try {
+            setLoading(true);
+            const response = await Axios({
+                ...SummaryApi.get_product,
+                data: {
+                    page: 1,
+                    limit: 100, // Lấy tất cả sản phẩm
+                },
+            });
+
+            if (response.data.success) {
+                setProducts(response.data.data);
+            }
+        } catch (error) {
+            console.error('Error fetching products:', error);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const totalPages = Math.ceil(products.length / itemsPerPage);
+    const currentProducts = products.slice(
+        currentPage * itemsPerPage,
+        currentPage * itemsPerPage + itemsPerPage
+    );
+
+    const handlePrev = () => {
+        setCurrentPage((prev) => (prev > 0 ? prev - 1 : totalPages - 1));
+    };
+
+    const handleNext = () => {
+        setCurrentPage((prev) => (prev < totalPages - 1 ? prev + 1 : 0));
+    };
+
+    // Tạo URL chi tiết sản phẩm (giống product-card.tsx)
+    const getProductUrl = (product) => {
+        return `/product/${product.name.toLowerCase().replace(/\s+/g, '-')}-${product._id}`;
+    };
+
+    // Lấy tên category đầu tiên (đã populate)
+    const getCategoryName = (product) => {
+        if (product.category && product.category.length > 0) {
+            return product.category[0]?.name || 'Món ăn';
+        }
+        return 'Món ăn';
+    };
+
     return (
-        <div className="md:col-span-6 lg:col-span-6 grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div className="md:col-span-3 flex justify-between items-end mb-2">
+        <section className="col-span-6">
+            <div className="md:col-span-3 mb-6">
                 <div>
                     <h3 className="text-3xl font-['Noto_Serif'] font-bold">
                         Featured Creations
                     </h3>
                     <p className="text-[#56423d] font-['Inter'] text-sm mt-1">
-                        This month&apos;s highlighted plates from Executive Chef
-                        Adrian Vance.
+                        Khám phá các món ăn nổi bật của nhà hàng chúng tôi.
                     </p>
                 </div>
-                <a
-                    className="text-[#C05E42] font-['Inter'] text-xs font-bold uppercase tracking-widest flex items-center gap-2 hover:translate-x-1 transition-transform"
-                    href="#"
-                >
-                    View Full Menu <span className="text-sm">→</span>
-                </a>
-            </div>
 
-            {dishes.map((dish, index) => (
-                <div key={index} className="group cursor-pointer">
-                    <div className="relative overflow-hidden rounded-xl mb-4 aspect-[4/5] bg-[#f7f3ee]">
-                        <img
-                            alt={dish.name}
-                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                            src={dish.image}
-                        />
-                        <div className="absolute top-4 right-4 bg-white/90 backdrop-blur-sm px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest text-[#1c1c19]">
-                            {dish.category}
+                <div className="flex items-center gap-3">
+                    {/* Page indicator */}
+                    {totalPages > 1 && (
+                        <span className="text-[#56423d] font-['Inter'] text-xs tracking-widest">
+                            {currentPage + 1} / {totalPages}
+                        </span>
+                    )}
+
+                    {/* Navigation buttons */}
+                    {totalPages > 1 && (
+                        <div className="flex items-center gap-2">
+                            <button
+                                onClick={handlePrev}
+                                className="w-9 h-9 rounded-full border border-[#d4c5b9] flex items-center justify-center text-[#1c1c19] hover:bg-[#C05E42] hover:text-white hover:border-[#C05E42] transition-all duration-300"
+                                aria-label="Trang trước"
+                            >
+                                <svg
+                                    xmlns="http://www.w3.org/2000/svg"
+                                    width="16"
+                                    height="16"
+                                    viewBox="0 0 24 24"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    strokeWidth="2"
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                >
+                                    <polyline points="15 18 9 12 15 6" />
+                                </svg>
+                            </button>
+                            <button
+                                onClick={handleNext}
+                                className="w-9 h-9 rounded-full border border-[#d4c5b9] flex items-center justify-center text-[#1c1c19] hover:bg-[#C05E42] hover:text-white hover:border-[#C05E42] transition-all duration-300"
+                                aria-label="Trang sau"
+                            >
+                                <svg
+                                    xmlns="http://www.w3.org/2000/svg"
+                                    width="16"
+                                    height="16"
+                                    viewBox="0 0 24 24"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    strokeWidth="2"
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                >
+                                    <polyline points="9 6 15 12 9 18" />
+                                </svg>
+                            </button>
                         </div>
-                    </div>
-                    <h4 className="text-xl font-['Noto_Serif'] font-bold mb-1 group-hover:text-[#C05E42] transition-colors">
-                        {dish.name}
-                    </h4>
-                    <p className="text-[#56423d] text-sm font-['Inter']">
-                        {dish.description}
-                    </p>
+                    )}
                 </div>
-            ))}
-        </div>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                {/* Loading skeleton */}
+                {loading &&
+                    Array.from({ length: itemsPerPage }).map((_, i) => (
+                        <div key={i} className="animate-pulse">
+                            <div className="rounded-xl mb-4 aspect-[4/5] bg-[#e8e0d6]" />
+                            <div className="h-5 bg-[#e8e0d6] rounded w-3/4 mb-2" />
+                            <div className="h-4 bg-[#e8e0d6] rounded w-1/2" />
+                        </div>
+                    ))}
+
+                {/* Product cards */}
+                {!loading &&
+                    currentProducts.map((product, index) => (
+                        <Link
+                            key={product._id || index}
+                            to={getProductUrl(product)}
+                            onClick={() =>
+                                window.scrollTo({ top: 0, behavior: 'smooth' })
+                            }
+                            className="group cursor-pointer block"
+                        >
+                            <div className="relative overflow-hidden rounded-xl mb-4 aspect-[4/5] bg-[#f7f3ee]">
+                                <img
+                                    alt={product.name}
+                                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                                    src={
+                                        product.image?.[0] ||
+                                        'https://placehold.co/400x500?text=No+Image'
+                                    }
+                                />
+                                <div className="absolute top-4 right-4 bg-white/90 backdrop-blur-sm px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest text-[#1c1c19]">
+                                    {getCategoryName(product)}
+                                </div>
+
+                                {/* Price badge */}
+                                <div className="absolute bottom-4 left-4 bg-[#1c1c19]/80 backdrop-blur-sm px-3 py-1.5 rounded-full">
+                                    <span className="text-white font-['Inter'] text-sm font-semibold">
+                                        {product.price?.toLocaleString('vi-VN')}
+                                        đ
+                                    </span>
+                                    {product.discount > 0 && (
+                                        <span className="ml-2 text-[#C05E42] font-['Inter'] text-xs font-bold">
+                                            -{product.discount}%
+                                        </span>
+                                    )}
+                                </div>
+                            </div>
+                            <h4 className="text-xl font-['Noto_Serif'] font-bold mb-1 group-hover:text-[#C05E42] transition-colors line-clamp-1">
+                                {product.name}
+                            </h4>
+                            <p className="text-[#56423d] text-sm font-['Inter'] line-clamp-2">
+                                {product.description ||
+                                    'Thưởng thức hương vị đặc biệt.'}
+                            </p>
+                        </Link>
+                    ))}
+
+                {/* Empty state */}
+                {!loading && products.length === 0 && (
+                    <div className="md:col-span-3 text-center py-12 text-[#56423d] font-['Inter']">
+                        <p className="text-lg">Chưa có món ăn nào.</p>
+                    </div>
+                )}
+            </div>
+        </section>
     );
 };

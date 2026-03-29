@@ -15,7 +15,6 @@ import SummaryApi from './common/SummaryApi';
 import GlobalProvider from './provider/GlobalProvider';
 import AxiosToastError from './utils/AxiosToastError';
 import Header from './components/Header';
-import { Footer } from './components/footer';
 import LiquidEther from './components/LiquidEther';
 import AiChatBox from './components/AiChatBox';
 import SupportChatBox from './components/SupportChatBox';
@@ -131,7 +130,7 @@ function App() {
                                 <Outlet />
                             </div>
                         </main>
-                        <Footer />
+                        {/* <Footer /> */}
                     </>
                 )}
 

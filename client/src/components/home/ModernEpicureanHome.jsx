@@ -14,7 +14,7 @@ export const ModernEpicureanHome = () => {
             <Header />
 
             {/* Main Content */}
-            <main className="pt-32 pb-24 px-6 md:px-12 max-w-screen-2xl mx-auto">
+            <main className="pt-32 pb-24 container mx-auto">
                 {/* Hero Editorial Section */}
                 <HeroEditorial />
 

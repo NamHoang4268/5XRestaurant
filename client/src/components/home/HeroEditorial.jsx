@@ -37,7 +37,7 @@ export const HeroEditorial = () => {
     );
 
     return (
-        <section>
+        <section className="w-full">
             <header className="mb-12">
                 <div className="mb-4 flex items-center gap-2">
                     <img src={logo} alt="EatEase logo" width={30} height={30} />
