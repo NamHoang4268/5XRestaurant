@@ -88,12 +88,10 @@ export const FeaturedDishes = () => {
 
     return (
         <section className="col-span-6">
-            <div className="md:col-span-3 mb-6">
+            <div className="mb-6 flex justify-between items-center">
                 <div>
-                    <h3 className="text-3xl font-['Noto_Serif'] font-bold">
-                        Featured Creations
-                    </h3>
-                    <p className="text-[#56423d] font-['Inter'] text-sm mt-1">
+                    <h3 className="text-3xl font-bold">Món ăn nổi bật</h3>
+                    <p className="text-[#C96048] text-sm mt-1">
                         Khám phá các món ăn nổi bật của nhà hàng chúng tôi.
                     </p>
                 </div>
@@ -101,7 +99,7 @@ export const FeaturedDishes = () => {
                 <div className="flex items-center gap-3">
                     {/* Page indicator */}
                     {totalPages > 1 && (
-                        <span className="text-[#56423d] font-['Inter'] text-xs tracking-widest">
+                        <span className="text-[#C96048] text-sm font-semibold tracking-widest">
                             {currentPage + 1} / {totalPages}
                         </span>
                     )}
@@ -111,7 +109,7 @@ export const FeaturedDishes = () => {
                         <div className="flex items-center gap-2">
                             <button
                                 onClick={handlePrev}
-                                className="w-9 h-9 rounded-full border border-[#d4c5b9] flex items-center justify-center text-[#1c1c19] hover:bg-[#C05E42] hover:text-white hover:border-[#C05E42] transition-all duration-300"
+                                className="w-9 h-9 rounded-full border border-[#E8CFC5] flex items-center justify-center hover:bg-[#C96048] hover:text-white hover:border-[#C96048] transition-all duration-300"
                                 aria-label="Trang trước"
                             >
                                 <svg
@@ -130,7 +128,7 @@ export const FeaturedDishes = () => {
                             </button>
                             <button
                                 onClick={handleNext}
-                                className="w-9 h-9 rounded-full border border-[#d4c5b9] flex items-center justify-center text-[#1c1c19] hover:bg-[#C05E42] hover:text-white hover:border-[#C05E42] transition-all duration-300"
+                                className="w-9 h-9 rounded-full border border-[#E8CFC5] flex items-center justify-center hover:bg-[#C96048] hover:text-white hover:border-[#C96048] transition-all duration-300"
                                 aria-label="Trang sau"
                             >
                                 <svg
@@ -156,9 +154,9 @@ export const FeaturedDishes = () => {
                 {loading &&
                     Array.from({ length: itemsPerPage }).map((_, i) => (
                         <div key={i} className="animate-pulse">
-                            <div className="rounded-xl mb-4 aspect-[4/5] bg-[#e8e0d6]" />
-                            <div className="h-5 bg-[#e8e0d6] rounded w-3/4 mb-2" />
-                            <div className="h-4 bg-[#e8e0d6] rounded w-1/2" />
+                            <div className="rounded-xl mb-4 aspect-[4/5] bg-muted" />
+                            <div className="h-5 bg-muted rounded w-3/4 mb-2" />
+                            <div className="h-4 bg-muted rounded w-1/2" />
                         </div>
                     ))}
 
@@ -173,7 +171,7 @@ export const FeaturedDishes = () => {
                             }
                             className="group cursor-pointer block"
                         >
-                            <div className="relative overflow-hidden rounded-xl mb-4 aspect-[4/5] bg-[#f7f3ee]">
+                            <div className="relative overflow-hidden rounded-xl mb-4 aspect-[4/5] bg-card">
                                 <img
                                     alt={product.name}
                                     className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
@@ -182,27 +180,27 @@ export const FeaturedDishes = () => {
                                         'https://placehold.co/400x500?text=No+Image'
                                     }
                                 />
-                                <div className="absolute top-4 right-4 bg-white/90 backdrop-blur-sm px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest text-[#1c1c19]">
+                                <div className="absolute top-4 right-4 bg-background/90 backdrop-blur-sm px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest text-foreground">
                                     {getCategoryName(product)}
                                 </div>
 
                                 {/* Price badge */}
-                                <div className="absolute bottom-4 left-4 bg-[#1c1c19]/80 backdrop-blur-sm px-3 py-1.5 rounded-full">
+                                <div className="absolute bottom-4 left-4 bg-[#1E1008]/80 backdrop-blur-sm px-3 py-1.5 rounded-full">
                                     <span className="text-white font-['Inter'] text-sm font-semibold">
                                         {product.price?.toLocaleString('vi-VN')}
                                         đ
                                     </span>
                                     {product.discount > 0 && (
-                                        <span className="ml-2 text-[#C05E42] font-['Inter'] text-xs font-bold">
+                                        <span className="ml-2 text-[#E8856A] text-xs font-bold">
                                             -{product.discount}%
                                         </span>
                                     )}
                                 </div>
                             </div>
-                            <h4 className="text-xl font-['Noto_Serif'] font-bold mb-1 group-hover:text-[#C05E42] transition-colors line-clamp-1">
+                            <h4 className="text-xl font-bold mb-1 group-hover:text-[#C96048] transition-colors line-clamp-1">
                                 {product.name}
                             </h4>
-                            <p className="text-[#56423d] text-sm font-['Inter'] line-clamp-2">
+                            <p className="text-[#7A5040] text-sm line-clamp-2">
                                 {product.description ||
                                     'Thưởng thức hương vị đặc biệt.'}
                             </p>
@@ -211,7 +209,7 @@ export const FeaturedDishes = () => {
 
                 {/* Empty state */}
                 {!loading && products.length === 0 && (
-                    <div className="md:col-span-3 text-center py-12 text-[#56423d] font-['Inter']">
+                    <div className="md:col-span-3 text-center py-12 text-[#7A5040]">
                         <p className="text-lg">Chưa có món ăn nào.</p>
                     </div>
                 )}

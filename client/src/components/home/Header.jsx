@@ -1,9 +1,9 @@
-import { Button } from '@/components/ui/button';
-import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
-import { Menu, MessageSquare } from 'lucide-react';
+import { Button } from '../ui/button';
+import { Sheet, SheetContent, SheetTrigger } from '../ui/sheet';
+import { Menu, MessageSquare, Search as SearchIcon, X } from 'lucide-react';
 import logo from '@/assets/logo.png';
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import {
     FaBoxOpen,
     FaCaretDown,
@@ -16,16 +16,20 @@ import {
 // eslint-disable-next-line no-unused-vars
 import { AnimatePresence, motion } from 'framer-motion';
 import { useSelector } from 'react-redux';
-import UserMenu from '@/components/UserMenu';
-import { useGlobalContext } from '@/provider/GlobalProvider';
+import UserMenu from '../UserMenu';
+import { useGlobalContext } from '../../provider/GlobalProvider';
 import defaultAvatar from '@/assets/defaultAvatar.png';
-import Search from '@/components/Search';
+import Search from '../Search';
 import { valideURLConvert } from '@/utils/valideURLConvert';
-import { ThemeToggle } from '@/components/theme-toggle';
-import { useSupportChat } from '@/contexts/SupportChatContext';
+import { ThemeToggle } from '../theme-toggle';
+import { useSupportChat } from '../../contexts/SupportChatContext';
 
-export const Header = () => {
+export default function Header() {
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+    const [searchOpen, setSearchOpen] = useState(false);
+    const [searchQuery, setSearchQuery] = useState('');
+    const searchRef = useRef(null);
+    const searchInputRef = useRef(null);
     const user = useSelector((state) => state?.user);
     const { unreadCount } = useSupportChat();
     const categoryData =
@@ -60,8 +64,22 @@ export const Header = () => {
     ];
 
     const navigate = useNavigate();
+    const location = useLocation();
     const [openUserMenu, setOpenUserMenu] = useState(false);
     const menuRef = useRef(null);
+
+    // Helper: kiểm tra link có đang active không
+    const isActiveLink = (href) => {
+        const path = location.pathname;
+        if (href === '/') return path === '/';
+        // Link category (dynamic) — active nếu path chứa category _id hoặc bắt đầu /products
+        if (firstCategory && href.includes(firstCategory._id)) {
+            return (
+                path.includes(firstCategory._id) || path.startsWith('/products')
+            );
+        }
+        return path.startsWith(href);
+    };
 
     useEffect(() => {
         const handleClick = (event) => {
@@ -85,6 +103,25 @@ export const Header = () => {
         };
     }, []);
 
+    useEffect(() => {
+        if (!searchOpen) return;
+        const handleClickOutside = (e) => {
+            if (searchRef.current && !searchRef.current.contains(e.target)) {
+                setSearchOpen(false);
+                setSearchQuery('');
+            }
+        };
+        document.addEventListener('mousedown', handleClickOutside, true);
+        return () =>
+            document.removeEventListener('mousedown', handleClickOutside, true);
+    }, [searchOpen]);
+
+    useEffect(() => {
+        if (searchOpen) {
+            setTimeout(() => searchInputRef.current?.focus(), 50);
+        }
+    }, [searchOpen]);
+
     const toggleUserMenu = useCallback((e) => {
         e.stopPropagation();
         setOpenUserMenu((prev) => !prev);
@@ -92,6 +129,13 @@ export const Header = () => {
 
     const closeMenu = useCallback(() => setOpenUserMenu(false), []);
     const closeMobileMenu = useCallback(() => setIsMobileMenuOpen(false), []);
+
+    const handleSearchChange = (e) => {
+        const value = e.target.value;
+        setSearchQuery(value);
+        navigate(`/search?q=${value}`);
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    };
 
     const redirectToLoginPage = () => navigate('/login');
 
@@ -107,241 +151,159 @@ export const Header = () => {
     };
 
     return (
-        <nav className="fixed top-0 w-full z-50 liquid-glass-header font-semibold">
-            <div className="h-20 flex justify-between items-center px-8 max-w-screen-2xl mx-auto w-full">
-                {/* Brand Logo */}
-                <Link
-                    to="/"
-                    onClick={scrollToTop}
-                    className="flex items-center justify-center gap-1.5"
-                >
-                    <img src={logo} alt="EatEase logo" width={30} height={30} />
-                    <span className="text-orange-800 font-['Noto_Serif'] font-bold text-2xl tracking-tighter">
-                        EatEase
-                    </span>
-                </Link>
-
-                <div className="hidden md:flex items-center gap-6 tracking-tight">
-                    <nav className="flex items-center gap-6 text-sm">
-                        {links.map((l) => {
-                            return (
-                                <Link
-                                    key={l.href}
-                                    to={l.href}
-                                    className="hover:text-orange-500 transition-colors flex items-center gap-[6px]"
-                                >
-                                    {l.label}
-                                </Link>
-                            );
-                        })}
-                    </nav>
-                    <Link
-                        to="/booking"
-                        onClick={handleClickBooking}
-                        className="bg-orange-700 text-white px-8 py-2 rounded-full text-sm font-medium tracking-wide hover:opacity-90 transition-all active:scale-95"
-                    >
-                        Đặt bàn
-                    </Link>
-                </div>
-
-                {/* User Actions */}
-                <div className="hidden md:flex items-center gap-4">
-                    <ThemeToggle />
-                    <div className="flex items-center justify-end gap-5">
-                        {user?._id ? (
-                            <div className="flex items-center gap-4">
-                                {user.role === 'ADMIN' && (
-                                    <Link
-                                        to="/dashboard/support-chat"
-                                        className="relative p-2 rounded-full hover:bg-white/10 transition-colors text-gray-300 hover:text-white"
-                                        title="Hỗ trợ khách hàng"
-                                    >
-                                        <MessageSquare className="h-5 w-5" />
-                                        {unreadCount > 0 && (
-                                            <span className="absolute top-1 right-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[9px] font-bold text-white border-2 border-[#1a1a1a]">
-                                                {unreadCount > 9
-                                                    ? '9+'
-                                                    : unreadCount}
-                                            </span>
-                                        )}
-                                    </Link>
-                                )}
-                                <div className="relative" ref={menuRef}>
-                                    <button
-                                        onClick={toggleUserMenu}
-                                        className="flex items-center gap-2 w-full px-2 py-1.5 rounded-lg hover:bg-background/15 transition-colors"
-                                        aria-expanded={openUserMenu}
-                                        aria-haspopup="true"
-                                        aria-label="User menu"
-                                        type="button"
-                                    >
-                                        <div className="relative p-0.5 overflow-hidden rounded-full liquid-glass-2">
-                                            <img
-                                                src={
-                                                    user.avatar || defaultAvatar
-                                                }
-                                                alt={user.name}
-                                                className="w-8 h-8 rounded-full object-cover"
-                                                width={32}
-                                                height={32}
-                                            />
-                                        </div>
-                                        <div className="flex flex-col items-start flex-1 min-w-0">
-                                            <span className="text-sm font-medium truncate max-w-16 lg:max-w-20 xl:max-w-max">
-                                                {user.name}
-                                            </span>
-                                            {user.role === 'ADMIN' && (
-                                                <span className="text-xs text-highlight py-0.5 px-1 bg-background rounded-md">
-                                                    Quản trị
-                                                </span>
-                                            )}
-                                        </div>
-                                        {openUserMenu ? (
-                                            <FaCaretUp
-                                                className="flex-shrink-0 ml-2"
-                                                size={15}
-                                            />
-                                        ) : (
-                                            <FaCaretDown
-                                                className="flex-shrink-0 ml-2"
-                                                size={15}
-                                            />
-                                        )}
-                                    </button>
-                                    <AnimatePresence>
-                                        {openUserMenu && (
-                                            <motion.div
-                                                className="absolute right-0 top-full mt-2 z-50 w-64"
-                                                initial={{
-                                                    opacity: 0,
-                                                    y: -10,
-                                                }}
-                                                animate={{
-                                                    opacity: 1,
-                                                    y: 0,
-                                                }}
-                                                exit={{
-                                                    opacity: 0,
-                                                    y: -10,
-                                                }}
-                                                transition={{
-                                                    duration: 0.15,
-                                                    ease: 'easeOut',
-                                                }}
-                                            >
-                                                <UserMenu
-                                                    close={closeMenu}
-                                                    menuTriggerRef={menuRef}
-                                                />
-                                            </motion.div>
-                                        )}
-                                    </AnimatePresence>
-                                </div>
-                            </div>
-                        ) : (
-                            <button
-                                onClick={redirectToLoginPage}
-                                className="underline text-sm hover:text-foreground transition-colors"
-                            >
-                                Đăng nhập
-                            </button>
-                        )}
-                    </div>
-                </div>
-
-                {/* Mobile Nav */}
-                <div className="md:hidden">
-                    <Sheet
-                        open={isMobileMenuOpen}
-                        onOpenChange={setIsMobileMenuOpen}
-                    >
-                        <SheetTrigger asChild>
-                            <Button
-                                variant="outline"
-                                size="icon"
-                                className="border-gray-700 bg-gray-800 hover:bg-gray-600 hover:text-lime-300"
-                            >
-                                <Menu className="h-5 w-5" />
-                                <span className="sr-only">Open menu</span>
-                            </Button>
-                        </SheetTrigger>
-                        <SheetContent
-                            side="right"
-                            className="liquid-glass border-gray-800 p-0 w-72 flex flex-col"
+        <>
+            <header className="sticky top-0 z-50 p-4 dark:text-red-50 font-semibold">
+                <div className="container mx-auto">
+                    <div className="flex h-16 items-center justify-between px-6 liquid-glass-header rounded-full">
+                        {/* Brand Logo */}
+                        <Link
+                            to="/"
+                            onClick={scrollToTop}
+                            className="flex items-center justify-center gap-1.5"
                         >
-                            <div className="flex items-center gap-1.5 px-4 py-4 border-b border-gray-800">
-                                <Link
-                                    to="/"
-                                    onClick={scrollToTop}
-                                    className="flex items-center gap-1.5"
-                                >
-                                    <img
-                                        src={logo}
-                                        alt="EatEase logo"
-                                        width={25}
-                                        height={25}
-                                        className="h-5 w-5"
-                                    />
-                                    <span className="font-semibold tracking-wide">
-                                        EatEase
-                                    </span>
-                                </Link>
-                            </div>
+                            <img
+                                src={logo}
+                                alt="EatEase logo"
+                                width={25}
+                                height={25}
+                                className="h-5 w-5"
+                            />
+                            <span className="text-orange-800 font-semibold text-lg tracking-wide">
+                                EatEase
+                            </span>
+                        </Link>
 
-                            <div className="px-2">
-                                <Search />
-                            </div>
-
-                            <nav className="flex flex-col gap-1 mt-2 text-gray-200">
+                        {/* Desktop Nav */}
+                        <div className="hidden md:flex items-center gap-6">
+                            <nav className="flex items-center gap-6 text-sm">
                                 {links.map((l) => {
-                                    const isBookingLink = l.href === '/booking';
-                                    const handleClick = () => {
-                                        if (isBookingLink && !user?._id) {
-                                            redirectToLoginPage();
-                                            closeMobileMenu();
-                                        } else {
-                                            closeMenu();
-                                            closeMobileMenu();
-                                            scrollToTop();
-                                        }
-                                    };
+                                    const active = isActiveLink(l.href);
                                     return (
                                         <Link
                                             key={l.href}
-                                            to={
-                                                isBookingLink && !user?._id
-                                                    ? '#'
-                                                    : l.href
-                                            }
-                                            onClick={handleClick}
-                                            className="flex items-center gap-3 px-4 py-3 hover:bg-gray-900 hover:text-purple-400 transition-colors"
+                                            to={l.href}
+                                            onClick={scrollToTop}
+                                            className={`relative flex items-center gap-[6px] transition-colors pb-0.5
+                                                ${
+                                                    active
+                                                        ? 'text-[#C96048] font-semibold'
+                                                        : 'hover:text-[#C96048]'
+                                                }`}
                                         >
-                                            <span className="inline-flex items-center justify-center w-5 h-5">
-                                                {l.icon}
-                                            </span>
-                                            <span className="text-sm">
-                                                {l.label}
-                                            </span>
+                                            {l.label}
+                                            {/* Gạch dưới active */}
+                                            {active && (
+                                                <motion.span
+                                                    layoutId="nav-underline"
+                                                    className="absolute bottom-[-3px] left-0 h-[2px] w-full rounded-full bg-[#C96048]"
+                                                    transition={{
+                                                        type: 'spring',
+                                                        stiffness: 380,
+                                                        damping: 30,
+                                                    }}
+                                                />
+                                            )}
                                         </Link>
                                     );
                                 })}
                             </nav>
-                            <div className="mt-auto border-t border-gray-800 p-4">
-                                <div className="flex items-center justify-center w-full gap-5">
-                                    {user?._id ? (
-                                        <div
-                                            className="relative w-full"
-                                            ref={menuRef}
+                            <Link
+                                to="/booking"
+                                onClick={handleClickBooking}
+                                className="bg-orange-700 text-white px-8 py-2 rounded-full text-sm font-medium tracking-wide hover:opacity-90 transition-all active:scale-95"
+                            >
+                                Đặt bàn
+                            </Link>
+                        </div>
+
+                        {/* User Actions */}
+                        <div className="hidden md:flex items-center gap-1.5">
+                            {/* Expanding Search */}
+                            <div
+                                ref={searchRef}
+                                className="flex items-center gap-1"
+                            >
+                                <AnimatePresence>
+                                    {searchOpen && (
+                                        <motion.div
+                                            key="search-input"
+                                            initial={{ width: 0, opacity: 0 }}
+                                            animate={{ width: 200, opacity: 1 }}
+                                            exit={{ width: 0, opacity: 0 }}
+                                            transition={{
+                                                duration: 0.22,
+                                                ease: [0.4, 0, 0.2, 1],
+                                            }}
+                                            className="overflow-hidden"
                                         >
+                                            <input
+                                                ref={searchInputRef}
+                                                type="text"
+                                                value={searchQuery}
+                                                onChange={handleSearchChange}
+                                                onKeyDown={(e) => {
+                                                    if (e.key === 'Escape') {
+                                                        setSearchOpen(false);
+                                                        setSearchQuery('');
+                                                    }
+                                                }}
+                                                placeholder="Tìm kiếm món ăn..."
+                                                className="w-full h-8 bg-background/60 border border-[#C96048]/40 rounded-full px-4 text-xs outline-none focus:border-[#C96048] text-foreground placeholder:text-muted-foreground transition-colors"
+                                                spellCheck={false}
+                                            />
+                                        </motion.div>
+                                    )}
+                                </AnimatePresence>
+                                <button
+                                    onClick={() => {
+                                        if (searchOpen) {
+                                            setSearchOpen(false);
+                                            setSearchQuery('');
+                                        } else {
+                                            setSearchOpen(true);
+                                        }
+                                    }}
+                                    className="p-2 rounded-full hover:bg-[#C96048]/10 transition-colors text-foreground hover:text-[#C96048]"
+                                    aria-label="Tìm kiếm"
+                                    title="Tìm kiếm"
+                                >
+                                    {searchOpen ? (
+                                        <X size={15} />
+                                    ) : (
+                                        <SearchIcon size={15} />
+                                    )}
+                                </button>
+                            </div>
+                            <ThemeToggle />
+                            <div className="flex items-center justify-end gap-5">
+                                {user?._id ? (
+                                    <div className="flex items-center gap-4">
+                                        {user.role === 'ADMIN' && (
+                                            <Link
+                                                to="/dashboard/support-chat"
+                                                className="relative p-2 rounded-full hover:bg-white/10 transition-colors text-gray-300 hover:text-white"
+                                                title="Hỗ trợ khách hàng"
+                                            >
+                                                <MessageSquare className="h-5 w-5" />
+                                                {unreadCount > 0 && (
+                                                    <span className="absolute top-1 right-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[9px] font-bold text-white border-2 border-[#1a1a1a]">
+                                                        {unreadCount > 9
+                                                            ? '9+'
+                                                            : unreadCount}
+                                                    </span>
+                                                )}
+                                            </Link>
+                                        )}
+                                        <div className="relative" ref={menuRef}>
                                             <button
                                                 onClick={toggleUserMenu}
-                                                className="flex items-center gap-2 w-full px-2 py-1.5 rounded-lg hover:bg-white/10 transition-colors"
+                                                className="flex items-center gap-2 w-full px-2 py-1.5 rounded-lg hover:bg-background/15 transition-colors"
                                                 aria-expanded={openUserMenu}
                                                 aria-haspopup="true"
                                                 aria-label="User menu"
                                                 type="button"
                                             >
-                                                <div className="relative p-0.5 overflow-hidden rounded-full liquid-glass">
+                                                <div className="relative p-0.5 overflow-hidden rounded-full liquid-glass-2">
                                                     <img
                                                         src={
                                                             user.avatar ||
@@ -354,22 +316,22 @@ export const Header = () => {
                                                     />
                                                 </div>
                                                 <div className="flex flex-col items-start flex-1 min-w-0">
-                                                    <span className="text-sm font-medium">
+                                                    <span className="text-sm font-medium truncate max-w-16 lg:max-w-20 xl:max-w-max">
                                                         {user.name}
                                                     </span>
                                                     {user.role === 'ADMIN' && (
-                                                        <span className="text-xs text-purple-400">
-                                                            Quản trị viên
+                                                        <span className="text-xs text-highlight py-0.5 px-1 bg-background rounded-md">
+                                                            Quản trị
                                                         </span>
                                                     )}
                                                 </div>
                                                 {openUserMenu ? (
-                                                    <FaCaretDown
+                                                    <FaCaretUp
                                                         className="flex-shrink-0 ml-2"
                                                         size={15}
                                                     />
                                                 ) : (
-                                                    <FaCaretUp
+                                                    <FaCaretDown
                                                         className="flex-shrink-0 ml-2"
                                                         size={15}
                                                     />
@@ -378,10 +340,10 @@ export const Header = () => {
                                             <AnimatePresence>
                                                 {openUserMenu && (
                                                     <motion.div
-                                                        className="absolute right-0 bottom-full mb-2 z-50 w-64"
+                                                        className="absolute right-0 top-full mt-2 z-50 w-64"
                                                         initial={{
                                                             opacity: 0,
-                                                            y: 10,
+                                                            y: -10,
                                                         }}
                                                         animate={{
                                                             opacity: 1,
@@ -397,10 +359,7 @@ export const Header = () => {
                                                         }}
                                                     >
                                                         <UserMenu
-                                                            close={() => {
-                                                                closeMenu();
-                                                                closeMobileMenu();
-                                                            }}
+                                                            close={closeMenu}
                                                             menuTriggerRef={
                                                                 menuRef
                                                             }
@@ -409,25 +368,212 @@ export const Header = () => {
                                                 )}
                                             </AnimatePresence>
                                         </div>
-                                    ) : (
-                                        <button
-                                            onClick={() => {
-                                                redirectToLoginPage();
-                                                closeMenu();
-                                                closeMobileMenu();
-                                                scrollToTop();
-                                            }}
-                                            className="w-full bg-lime-400 text-black font-medium rounded-lg px-6 py-2.5 hover:bg-lime-300 hover:shadow-md hover:scale-[1.02] transition-all"
-                                        >
-                                            Đăng nhập
-                                        </button>
-                                    )}
-                                </div>
+                                    </div>
+                                ) : (
+                                    <button
+                                        onClick={redirectToLoginPage}
+                                        className="underline text-sm hover:text-foreground transition-colors"
+                                    >
+                                        Đăng nhập
+                                    </button>
+                                )}
                             </div>
-                        </SheetContent>
-                    </Sheet>
+                        </div>
+
+                        {/* Mobile Nav */}
+                        <div className="md:hidden">
+                            <Sheet
+                                open={isMobileMenuOpen}
+                                onOpenChange={setIsMobileMenuOpen}
+                            >
+                                <SheetTrigger asChild>
+                                    <Button
+                                        variant="outline"
+                                        size="icon"
+                                        className="border-gray-700 bg-gray-800 hover:bg-gray-600 hover:text-lime-300"
+                                    >
+                                        <Menu className="h-5 w-5" />
+                                        <span className="sr-only">
+                                            Open menu
+                                        </span>
+                                    </Button>
+                                </SheetTrigger>
+                                <SheetContent
+                                    side="right"
+                                    className="liquid-glass border-gray-800 p-0 w-72 flex flex-col"
+                                >
+                                    <div className="flex items-center gap-1.5 px-4 py-4 border-b border-gray-800">
+                                        <Link
+                                            to="/"
+                                            onClick={scrollToTop}
+                                            className="flex items-center gap-1.5"
+                                        >
+                                            <img
+                                                src={logo}
+                                                alt="EatEase logo"
+                                                width={25}
+                                                height={25}
+                                                className="h-5 w-5"
+                                            />
+                                            <span className="font-semibold tracking-wide">
+                                                EatEase
+                                            </span>
+                                        </Link>
+                                    </div>
+                                    <div className="px-2">
+                                        <Search />
+                                    </div>
+                                    <nav className="flex flex-col gap-1 mt-2 text-gray-200">
+                                        {links.map((l) => {
+                                            const isBookingLink =
+                                                l.href === '/booking';
+                                            const handleClick = () => {
+                                                if (
+                                                    isBookingLink &&
+                                                    !user?._id
+                                                ) {
+                                                    redirectToLoginPage();
+                                                    closeMobileMenu();
+                                                } else {
+                                                    closeMenu();
+                                                    closeMobileMenu();
+                                                    scrollToTop();
+                                                }
+                                            };
+                                            return (
+                                                <Link
+                                                    key={l.href}
+                                                    to={
+                                                        isBookingLink &&
+                                                        !user?._id
+                                                            ? '#'
+                                                            : l.href
+                                                    }
+                                                    onClick={handleClick}
+                                                    className={`flex items-center gap-3 px-4 py-3 transition-colors ${
+                                                        isActiveLink(l.href)
+                                                            ? 'text-[#C96048] bg-[#C96048]/8 font-semibold border-l-2 border-[#C96048]'
+                                                            : 'hover:bg-gray-900 hover:text-[#C96048]'
+                                                    }`}
+                                                >
+                                                    <span className="inline-flex items-center justify-center w-5 h-5">
+                                                        {l.icon}
+                                                    </span>
+                                                    <span className="text-sm">
+                                                        {l.label}
+                                                    </span>
+                                                </Link>
+                                            );
+                                        })}
+                                    </nav>
+                                    <div className="mt-auto border-t border-gray-800 p-4">
+                                        <div className="flex items-center justify-center w-full gap-5">
+                                            {user?._id ? (
+                                                <div
+                                                    className="relative w-full"
+                                                    ref={menuRef}
+                                                >
+                                                    <button
+                                                        onClick={toggleUserMenu}
+                                                        className="flex items-center gap-2 w-full px-2 py-1.5 rounded-lg hover:bg-white/10 transition-colors"
+                                                        aria-expanded={
+                                                            openUserMenu
+                                                        }
+                                                        aria-haspopup="true"
+                                                        aria-label="User menu"
+                                                        type="button"
+                                                    >
+                                                        <div className="relative p-0.5 overflow-hidden rounded-full liquid-glass">
+                                                            <img
+                                                                src={
+                                                                    user.avatar ||
+                                                                    defaultAvatar
+                                                                }
+                                                                alt={user.name}
+                                                                className="w-8 h-8 rounded-full object-cover"
+                                                                width={32}
+                                                                height={32}
+                                                            />
+                                                        </div>
+                                                        <div className="flex flex-col items-start flex-1 min-w-0">
+                                                            <span className="text-sm font-medium">
+                                                                {user.name}
+                                                            </span>
+                                                            {user.role ===
+                                                                'ADMIN' && (
+                                                                <span className="text-xs text-purple-400">
+                                                                    Quản trị
+                                                                    viên
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                        {openUserMenu ? (
+                                                            <FaCaretDown
+                                                                className="flex-shrink-0 ml-2"
+                                                                size={15}
+                                                            />
+                                                        ) : (
+                                                            <FaCaretUp
+                                                                className="flex-shrink-0 ml-2"
+                                                                size={15}
+                                                            />
+                                                        )}
+                                                    </button>
+                                                    <AnimatePresence>
+                                                        {openUserMenu && (
+                                                            <motion.div
+                                                                className="absolute right-0 bottom-full mb-2 z-50 w-64"
+                                                                initial={{
+                                                                    opacity: 0,
+                                                                    y: 10,
+                                                                }}
+                                                                animate={{
+                                                                    opacity: 1,
+                                                                    y: 0,
+                                                                }}
+                                                                exit={{
+                                                                    opacity: 0,
+                                                                    y: -10,
+                                                                }}
+                                                                transition={{
+                                                                    duration: 0.15,
+                                                                    ease: 'easeOut',
+                                                                }}
+                                                            >
+                                                                <UserMenu
+                                                                    close={() => {
+                                                                        closeMenu();
+                                                                        closeMobileMenu();
+                                                                    }}
+                                                                    menuTriggerRef={
+                                                                        menuRef
+                                                                    }
+                                                                />
+                                                            </motion.div>
+                                                        )}
+                                                    </AnimatePresence>
+                                                </div>
+                                            ) : (
+                                                <button
+                                                    onClick={() => {
+                                                        redirectToLoginPage();
+                                                        closeMenu();
+                                                        closeMobileMenu();
+                                                        scrollToTop();
+                                                    }}
+                                                    className="w-full bg-lime-400 text-black font-medium rounded-lg px-6 py-2.5 hover:bg-lime-300 hover:shadow-md hover:scale-[1.02] transition-all"
+                                                >
+                                                    Đăng nhập
+                                                </button>
+                                            )}
+                                        </div>
+                                    </div>
+                                </SheetContent>
+                            </Sheet>
+                        </div>
+                    </div>
                 </div>
-            </div>
-        </nav>
+            </header>
+        </>
     );
-};
+}
