@@ -96,6 +96,11 @@ export async function addItemsToTableOrder(request, response) {
             tableOrder.items.push(...itemsToAdd);
             tableOrder.subTotal += subTotal;
             tableOrder.total = tableOrder.subTotal;
+
+            if (['Đã phục vụ', 'Đang chuẩn bị'].includes(tableOrder.paymentStatus)) {
+                tableOrder.paymentStatus = 'Chờ xử lý';
+            }
+
             await tableOrder.save();
         } else {
             // Create new order
@@ -223,6 +228,7 @@ export async function checkoutTableOrder(request, response) {
         if (paymentMethod === 'at_counter') {
             // At-counter: mark as pending_payment so Cashier can confirm cash later
             tableOrder.status = 'pending_payment';
+            tableOrder.paymentStatus = 'Chờ thanh toán';
             tableOrder.paymentRequest = 'at_counter';
             tableOrder.checkedOutAt = new Date();
             await tableOrder.save();
@@ -270,6 +276,7 @@ export async function checkoutTableOrder(request, response) {
             tableOrder.stripeSessionId = stripeSession.id;
             tableOrder.expectedTotal = tableOrder.total;
             tableOrder.status = 'pending_payment';
+            tableOrder.paymentStatus = 'Chờ thanh toán';
             tableOrder.paymentRequest = 'online';
             tableOrder.checkedOutAt = new Date();
             await tableOrder.save();
@@ -323,6 +330,7 @@ export async function cancelTableOrder(request, response) {
         }
 
         tableOrder.status = 'cancelled';
+        tableOrder.paymentStatus = 'Đã hủy';
         await tableOrder.save();
 
         return response.status(200).json({

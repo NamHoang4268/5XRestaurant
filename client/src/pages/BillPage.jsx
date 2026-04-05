@@ -109,34 +109,42 @@ const InvoicesTab = () => {
         } catch { setFilteredOrders(orders); }
     }, [orders, filterParams]);
 
-    // Group by table + 2-min window
+    // Map each TableOrder directly (no more 2-min merging since backend already groups items per table order)
     const groupedOrders = useMemo(() => {
-        const TIME_WINDOW_MS = 2 * 60 * 1000;
-        const groups = [];
-        const sorted = [...filteredOrders].sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
-        sorted.forEach(ob => {
+        return [...filteredOrders].map(ob => {
             const tableNum = ob.tableNumber && ob.tableNumber !== '-' && ob.tableNumber !== 'null' ? ob.tableNumber : 'Mang đi/Khác';
-            const itemTime = new Date(ob.createdAt).getTime();
-            let group = groups.find(g => {
-                if (ob.orderId && g.originalOrderIds.includes(ob.orderId)) return true;
-                if (tableNum !== 'Mang đi/Khác' && g.tableNumber === tableNum) return Math.abs(g.baseTime - itemTime) <= TIME_WINDOW_MS;
-                return false;
-            });
-            if (!group) {
-                const displayId = tableNum !== 'Mang đi/Khác'
-                    ? `TB${tableNum}-${format(new Date(ob.createdAt), 'HHmm')}`
-                    : `MD-${format(new Date(ob.createdAt), 'HHmm')}-${Math.floor(100 + Math.random() * 900)}`;
-                group = { virtualId: displayId, orderId: displayId, originalOrderIds: ob.orderId ? [ob.orderId] : [], tableNumber: tableNum, payment_status: ob.payment_status || 'Chờ xử lý', createdAt: ob.createdAt, baseTime: itemTime, customerName: ob.userId?.name || 'Khách vãng lai', customerPhone: ob.userId?.mobile || '', totalAmt: 0, items: [], documentIds: [] };
-                groups.push(group);
+            
+            let items = [];
+            if (ob.products?.length > 0) {
+                items = ob.products.map(p => ({
+                    name: p.name || 'N/A',
+                    quantity: p.quantity || 1,
+                    price: p.price || 0
+                }));
             } else {
-                if (ob.orderId && !group.originalOrderIds.includes(ob.orderId)) group.originalOrderIds.push(ob.orderId);
-                if (group.payment_status === 'Đã thanh toán' && ob.payment_status !== 'Đã thanh toán') group.payment_status = ob.payment_status;
+                const qty = ob.quantity || 1;
+                const lineTotal = ob.totalAmt || 0;
+                items = [{
+                    name: ob.product_details?.name || 'N/A',
+                    quantity: qty,
+                    price: qty > 0 ? lineTotal / qty : 0
+                }];
             }
-            if (!group.documentIds.includes(ob._id)) group.documentIds.push(ob._id);
-            if (ob.products?.length > 0) { ob.products.forEach(p => group.items.push({ name: p.name || 'N/A', quantity: p.quantity || 1, price: p.price || 0 })); group.totalAmt += ob.totalAmt || 0; }
-            else { const qty = ob.quantity || 1; const lineTotal = ob.totalAmt || 0; group.items.push({ name: ob.product_details?.name || 'N/A', quantity: qty, price: qty > 0 ? lineTotal / qty : 0 }); group.totalAmt += lineTotal; }
-        });
-        return groups.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+
+            return {
+                virtualId: ob._id,
+                orderId: ob._id.slice(-8).toUpperCase(),
+                originalOrderIds: [ob._id],
+                documentIds: [ob._id],
+                tableNumber: tableNum,
+                payment_status: ob.payment_status || 'Chờ xử lý',
+                createdAt: ob.createdAt,
+                customerName: ob.userId?.name || ob.customerId?.name || 'Khách vãng lai',
+                customerPhone: ob.userId?.mobile || ob.customerId?.phone || '',
+                totalAmt: ob.totalAmt || 0,
+                items: items
+            };
+        }).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
     }, [filteredOrders]);
 
     const searchedOrders = useMemo(() => {
@@ -182,7 +190,7 @@ const InvoicesTab = () => {
     const statusOptions = [
         { value: '', label: 'Tất cả' }, { value: 'Chờ xử lý', label: 'Chờ xử lý' },
         { value: 'Đang chuẩn bị', label: 'Đang chuẩn bị' }, { value: 'Đã phục vụ', label: 'Đã phục vụ' },
-        { value: 'Đang chờ thanh toán', label: 'Đang chờ thanh toán' },
+        { value: 'Chờ thanh toán', label: 'Chờ thanh toán' },
         { value: 'Đã thanh toán', label: 'Đã thanh toán' }, { value: 'Đã hủy', label: 'Đã hủy' },
     ];
     const canCancelOrder = (s) => ['Chờ xử lý', 'Đang chờ thanh toán', 'Chờ thanh toán'].includes(s);

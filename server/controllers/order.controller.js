@@ -24,7 +24,20 @@ export async function getAllOrders(request, response) {
 
         // tableOrder dùng paymentStatus thay vì payment_status
         if (status) {
-            query.paymentStatus = status;
+            if (status === 'Đã thanh toán') {
+                query.paymentStatus = { $in: ['paid', 'Đã thanh toán'] };
+            } else if (status === 'Chờ xử lý') {
+                query.paymentStatus = { $in: ['pending', 'Chờ xử lý'] };
+            } else if (status === 'Đã hoàn tiền') {
+                query.paymentStatus = { $in: ['refunded', 'Đã hoàn tiền'] };
+            } else if (status === 'Đã hủy') {
+                query.$or = [
+                    { paymentStatus: { $in: ['cancelled', 'Đã hủy'] } },
+                    { status: 'cancelled' }
+                ];
+            } else {
+                query.paymentStatus = status;
+            }
         }
 
         if (startDate || endDate) {
@@ -92,6 +105,7 @@ export async function updateOrderStatus(request, response) {
             order.status = 'paid';
         } else if (status === 'cancelled' || status === 'Đã hủy') {
             order.status = 'cancelled';
+            order.paymentStatus = 'Đã hủy';
         } else {
             order.paymentStatus = status;
         }
